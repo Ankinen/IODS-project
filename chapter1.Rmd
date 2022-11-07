@@ -1,3 +1,8 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
 
 # About the project
 
@@ -11,3 +16,13 @@ date()
 ```
 The text continues here.
 
+# My thoughts:
+I saw an email advertisement of this course and was very keen to join. I would like to learn more about data analytics and I have studied some data analytics using Python and Jupyter Notebook so studying R sounded very interesting. I also took part a couple of years ago to another course organized by Kimmo Vehkalahti (Johdatus Yhteiskuntatilastotieteeseen) and I must say it was all thanks to him that I finally started to understand something about statistics. That course just covers the basics so I am hoping to learn more about statistics in this course. So I am really looking forward to this course.
+
+# Reflecting my learning experience
+I think using the exercise1 together with the book makes it easier to go through the topics. I first tried to read just the book but it gets a bit tedious. Going it together with the exercise1 makes it a bit more interactive. The syntax in R is somewhat familiar with other programming languages but it also has many differences, so currently I am a bit worried if I remember all those functions and commands. Luckily the R for Health Data Science seems to be quire easy to browse so it will not be a big problem to check some of the functions or syntax later again.
+
+I just did the first four parts for now and it covers the basics so there was nothing too difficult yet. I always struggle with join function and I probably will do that again but it seemed that R is quite helpful here too as you can see the results of the joined tables very easily.
+
+# GitHub repository:
+https://github.com/Ankinen/IODS-project
