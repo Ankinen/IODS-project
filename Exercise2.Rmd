@@ -467,7 +467,7 @@ p1 <- ggpairs(learning2014, mapping = aes(col = gender), lower = list(combo = wr
 p1
 
 # add alpa = 0.3 inside aes()
-p2 <- ggpairs(learning2014, mapping = aes(col = gender), lower = list(combo = wrap("facethist", bins = 20)))
+p2 <- ggpairs(learning2014, mapping = aes(col = gender, alpha = 0.3), lower = list(combo = wrap("facethist", bins = 20)))
 
 # draw the plot once more
 p2
