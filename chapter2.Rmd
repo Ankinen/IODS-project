@@ -1,4 +1,4 @@
-# Insert chapter 2 title here
+# Analysing learning2014 data using multiple regression
 
 *Describe the work you have done this week and summarize your learning.*
 
@@ -10,4 +10,160 @@
 date()
 ```
 
-Here we go again...
+## Read the learning2014 data and explore the structure and dimensions of it.
+
+```{r}
+learning2014 <- read.table("data/learning2014.csv", sep=",", header=TRUE)
+dim(learning2014)
+str(learning2014)
+```
+### dimensions and structure of the data
+There are 166 observations and 7 variables in this data set. The variables are 'gender', 'age', 'attitude', 'deep', 'stra', 'surf', and 'points'. The 'deep', 'stra', and 'surf, refer to students' learning styles, deep, surface, and strategic learning.
+
+We are now using this data to try to explain the relationship between the points (dependent variable, or y) and age, attitude, deep, surface, strategic (the explanatory variables.) In explainig we use multivariable (or multiple) regression, which is one of the methods used in linear regression.
+
+## Graphical overview
+```{r}
+library(GGally)
+library(ggplot2)
+
+#graphical overview
+plotmatrix  <- ggpairs(learning2014, mapping = aes(col = gender, alpha = 0.3), lower = list(combo = wrap("facethist", bins = 20)))
+
+# draw the plot
+plotmatrix
+
+```
+
+## Summaries of the variables
+
+```{r}
+summary(learning2014)
+```
+
+## Linear Regression - explaining the plot and summaries
+
+In linear regression we want the the observed data to fit in to a descending or ascending line, because that would mean there most like is some kind of correlation. When the line fits well we can see a linear relationship between the explanatory and dependent variables. If the straight line does not fit well, we need to consider an alternative model. (We will see some regression lines using learning2014 data later.)
+
+The observations should also be normally distributed. If this is the case, the residuals should show a normal distribution with a mean of zero. If we observe the histograms above, we can see that most of them are not normally distributed, but this still too early to do any definite conclusions about the data.
+
+Here we just have a first glimpse of the data so that we can see how it all looks like.
+
+The third assumption that we have in linear modelling is that the residuals are independent. This is more of a concern when doing time series data analysis.
+
+The last assumption is that the residuals have equal variance. This means that the distance of the observations from the fitted line should be the same on the left and on the right.
+
+From the plot matrix we can observe that there are some possible outliers and that gender does not seem to play a big role  as both green and red dots are scattered more or less evenly.
+
+From the summary table we can see that the Median and mean values of each variable as well as their minimum and maximum values and the values in 25% and 75% mark.
+
+Let's further check the relationship between points and three explanatory variables, attitude, stra and surf.
+
+## Regression model for points + attitude, stra and surf
+
+```{r}
+# Fit a regression model where `points` is the target variable and `attitude`, `stra` and `surf` are the explanatory variables.
+linearmodel <- lm(points ~ attitude + stra + surf, data = learning2014)
+
+# print out the summary of the new model
+summary(linearmodel)
+```
+### Call:
+Here we can first see the function call where the points refers to the dependent variable and the variables after the `~` are the explanatory variables.
+
+### Residuals:
+Next is the residuals they tell the difference between the fitted line and the observations, here the median residual is 0.52. If our model fits well, the residual median should be close to zero and Q1 and Q3 should also be close to each other in magnitude (they are quite near). Also the maximun and minimum values should be near each other. However, in case of the maximum and minimun values, there might be some outliers which are affecting the results.As we can see from the residual boxplot this, indeed, seems to be the case.
+
+```{r}
+#residual boxplot
+
+boxplot(resid(linearmodel))
+```
+
+### Coefficients:
+**Estimates**
+
+Intercept represents the mean value of the expected response when all the predictor variables (explanatory variables) are equal to zero. Intercept is not always sensible number as sometimes the variable cannot have a value of zero. In this case it does make some sense because it is possible that the points are zero. For other features (the explanatory variables) the estimates give the estimated change in point when they are changed a unit.
+
+**Standard Error**
+Standard error, as the name suggests, is the standard error of our estimate. This allows us to construct marginal confidence intervals. [Here](https://www.r-bloggers.com/2021/11/calculate-confidence-intervals-in-r/) you can find more information about the ways to handle confidence intervals in R.
+
+**t-value**
+t-value tells us how far our estimated parameter is from a hypothesized 0 value, scaled by the standard deviation of the estimate.
+
+**P-value**
+The p-value for each variable tests the null hypothesis that the coefficient is equal to zero (i.e., no effect). If this probability is low enough (5% or under, preferably under) we can reject the null hypothesis. Here R helps us a bit and marks with asterisks the p-values that are statistically significant. But remember to not blindly trust this value!
+
+### The Last part of the summary
+The last part of the summary is for assessing the fit and overall significance of our model.
+
+**Residual Standard Error**
+Residual error gives the standard deviation of the residuals.
+
+**Multiple R-squared**
+
+R-squared tells the proportion of the variance in the dependent variable that can be explained by the explanatory variables. This means that the R-squared shows us how well the data fit our regression model. This figure does not give us any information about the causation relationship between the dependent and explanatory variables. It also does not indicate the correctness of the model. The higher the number, the more variability is explained. Our model is not clearly explaining our variables well. However, this number is also something we need to be cautious about. High score can indicate also that our model is overfitting to our data.
+
+**F-Statistic**
+F-test will tell you if means are significantly different.F-test will tell us if the group of variables are jointly significant.
+
+## Removing variables that are not statistically significant
+
+The previous summary showed us that only the attitude had a significant relationship with the dependent variable. In the following model only attitude is used in the model.
+
+```{r}
+# Fit a regression model where `points` is the target variable and `attitude`, `stra` and `surf` are the explanatory variables.
+linearmodelfitted <- lm(points ~ attitude, data = learning2014)
+
+# print out the summary of the new model
+summary(linearmodelfitted)
+```
+## Compare the results with the previous model
+We can see that there is no much change and that actually multiple R-square value is lower. Based on this, we can say that it does not seem that the data does not fit any better to this simpler model.
+
+# Diagnostic Plots
+
+In the plot function we can select from six different plots (at least). Here we have chosen number 1, i.e., Residual vs Fitted values, number 2, Normal QQ-plot and number 5, Residuals vs Leverage.
+
+which | graphic                                 
+----- | --------
+1     | Residuals vs Fitted values 
+2     | Normal QQ-plot
+3     | Standardized residuals vs Fitted values
+4     | Cook's distances
+5     | Residuals vs Leverage 
+6     | Cook's distance vs Leverage 
+
+**Residuals vs Fitted values**
+When this scatterplot shows a good fit for the linear model, the points appear to be randomly spread out about the line and there is no apparent non-linear trends or indications of non-constant variable. The red line which shows the average value of the residuals at each value of fitted value is perfectly flat. This also tells us that there is no discernible non-linear trend to the residuals. The residuals should also be equally variable across the entire range of fitted values.
+
+In the last model, where we only have attitude as the explanatory variable, the residuals vs Fitted values plot at first sight seems to be quite OK. However,the red line starts to go up somewhere around the Fitted value of 24. This indicates that there are some non-constant variance in our errors. The scatterplots are also gathered more evenly from around 20 to 26, below 20 and above 26 the scatterplot is not as even.This means that we should not believe our confidence intervals, prediction bands or the p-values in our regression.
+
+**Normal QQ-plot**
+The QQ plot helps us to assess if the residuals are normally distributed. When the residuals are matching perfectly the diagonal line, they are normally distributed.
+
+In our model we can see that the lower tail is heavier, i.e., they have larger values than what we would expect under the standard modeling assumptions. The upper tail on the other hand is lighter indicating that we have smaller values than what we would expect under the standard modeling assumptions. This means that our residuals are not normally distributed.
+
+**Residuals vs Leverage**
+One way of defining outliers are that they are points that are not approximated well by the model. This means that they have a large residual. This significantly influences model fit. Residuals vs Leverage is a way to have an estimate about the outliers.
+
+In a perfectly fit model, the Cook's distance curves do not even appear on the plot. None of the points come close to have both high residual and leverage.
+
+In our model, we have a few point that have a very high residual and some that have very high leverage.
+
+Looks to me that there might be some outliers in the data that should be taken into consideration (delete from the dataset?) to make the model better fit for the data. The first scatterplots in the plotmatrix also indicated the possibility of outliers so this result of the analysis is no surprise.
+
+Definitely our model need some further adjustment (at least) to be able to explain the dependent variable with the explanatory variables. However, the plots do not show anything that bad that would directly indicate that our explanatory variables would be completely useless either.
+
+```{r}
+par(mfrow = c(2,2))
+plot(linearmodelfitted, which = c(1,2,5))
+
+```
+
+Additional sources:
+https://boostedml.com/2019/06/linear-regression-in-r-interpreting-summarylm.html
+https://dss.princeton.edu/online_help/analysis/interpreting_regression.htm
+https://blog.minitab.com/en/adventures-in-statistics-2/how-to-interpret-regression-analysis-results-p-values-and-coefficients
+https://www.statology.org/intercept-in-regression/#:~:text=The%20intercept%20(sometimes%20called%20the,model%20are%20equal%20to%20zero.
+
