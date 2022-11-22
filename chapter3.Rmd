@@ -1,0 +1,227 @@
+# Logistic regression
+
+
+```{r}
+date()
+```
+Bring in the libraries
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(readr)
+library(finalfit)
+library(GGally)
+library(boot)
+```
+
+Read the table to dataframe alc
+
+```{r}
+alc <- read.table("data/alc.csv", sep=",", header=TRUE)
+colnames(alc)
+dim(alc)
+str(alc)
+```
+
+This data were collected by using school reports and questionnaires in order to study student achievement in secondary education of two Portuguese schools. The data attributes include student grades, demographic, social and school related features). Alc data consists of two datasets: Mathematics (mat) and Portuguese language (por). The two datasets were modeled under binary/five-level classification and regression tasks. Important note: the target attribute G3 has a strong correlation with attributes G2 and G1. This occurs because G3 is the final year grade (issued at the 3rd period), while G1 and G2 correspond to the 1st and 2nd period grades.
+(Source: https://archive.ics.uci.edu/ml/datasets/Student+Performance)
+
+## Analysis
+
+### The hypotheses:
+* h0 There is no relationship between the students alcohol consumption and the absences, sex, family support and mother's education level.
+* h1 The alcohol consumption is higher with students who have high number of absences.
+* h2 The alcohol consumption is higher among male than female students.
+* h3 The alcohol consumption is higher among male students whose mothers' education level is low than female students whose mothers' education level is low.
+* h4 The alcohol consumption is higher among male students who do not receive family support than female students who do not receive family support.
+* h5 The alcohol consumption is higher among male students with high absences number than female students with high absences number.
+* h6 The alcohol consumption is higher among students who have high number of absences, who are male, have no family support and whose mothers' education level is low.
+
+### Check the summary statistics of the dataset grouped by sex
+```{r}
+alc %>% group_by(sex, high_use) %>% summarise(count = n(), mean_grade = mean(G3))
+```
+
+Here we can see that there are 154 female students whose alcohol consumption is not high (i.e. combined workday and weekend alcohol consumption is less than 2). Their mean final grade was 11.4. There were 41 females whose alcohol consumption is defined a high and their mean final grade was 11.8. For male students, there were 105 whose alcohol consumption was low and their mean final grade was 12.3. And for the male students whose alcohol consumption was high, their mean final grade was 10.3.
+
+From this, it seem quite obvious that at least for male students, the alcohol consumption is very likely to affect the students school success. For female it seems to be the opposite but the difference is much smaller so the relationship is does not seem so obvious.
+
+Let's check how the boxplot looks like:
+
+```{r}
+# initialize a plot of high_use and G3
+g1 <- ggplot(alc, aes(x = high_use, y = G3, col = sex))
+
+# define the plot as a boxplot and draw it
+g1 + geom_boxplot() + ylab("grade") + ggtitle("Student final grade distribution by alcohol consumption and sex")
+```
+
+From the boxplot we can see that for females the students with low alcohol consumption the variance in final grade is larger and even though the mean is a bit lower than with the females define with high alcohol consumption their overall grade reaches higher. So this might explain the slight higher mean in females with high alcohol consumption.
+
+We'll take another variable, absences. First we check the numbers of high alcohol use students and their means of absences and then see how its distribution by alcohol consumption and sex looks like:
+```{r}
+alc %>% group_by(sex, high_use) %>% summarise(count = n(), mean_absence = mean(absences))
+```
+
+```{r}
+# initialize a plot of high_use and absences
+g2 <- ggplot(alc, aes(x = high_use, y = absences, col = sex))
+
+# define the plot as a boxplot and draw it
+g2 + geom_boxplot() + ggtitle("Student absences by alcohol consumption and sex")
+```
+
+We can see that the number look quite similar with the means of final grades. Both females and males who are defined as high in their alcohol consumption also have higher mean in the number of school absences. This would seem to confirm our hypothesis h1, "the alcohol consumption is higher with students who have high number of absences."
+
+Just out of curiosity, lets take two more variables, medu and famsup. Medu is the mother's education level. This variable has a numeric value ranging from 0 to 4 where 0 is no education, 1 is praimary education (4th grade), 2 is 5th to 9th grade, 3 is secondary education and 4 is higher education. Famsup is family support and it has two values, yes and no depending if the student receives educational support from family or not.
+
+Let's see the corresponding summaries first:
+```{r}
+alc %>% group_by(sex, high_use) %>% summarise(count = n(), mean_medu = mean(Medu))
+```
+```{r}
+alc %>% group_by(sex, high_use, famsup) %>% summarise(count = n())
+```
+From these numbers it seems that there are no big differences between the students whose alcohol consumption is high and those whose alcohol consumption is low. But lest see the box plot for mother's educational level. Because the Family support is a binary variable, drawing a box plot would not make it very informative. So we do not draw that.
+
+```{r}
+# initialize a plot of high_use and absences
+g3 <- ggplot(alc, aes(x = high_use, y = Medu, col = sex))
+
+# define the plot as a boxplot and draw it
+g3 + geom_boxplot() + ylab("Mother's education level") + ggtitle("Mother's education level by students alcohol consumption and sex")
+```
+We can draw a plot box to see the relationship of alcohol consumption, family support and absence, so we can do that. This box plot is not now directly comparable with the previous tables but we can see that there is some relationship between these three variables too.
+```{r}
+# initialize a plot of high_use and absences
+g4 <- ggplot(alc, aes(x = high_use, y = absences, col = famsup))
+
+# define the plot as a boxplot and draw it
+g4 + geom_boxplot() + ggtitle("Mother's education level by students alcohol consumption and sex")
+```
+From the box plots we can already see that our hypothesis h3 (The alcohol consumption is higher among male students whose mothers' education level is low than female students whose mothers' education level is low.) is not true. There is no significant difference between the male students whose alcohol consumption is high than with the female students with high alcohol consumption. Actually, we can see that there is no difference between the male and female students whose alcohol consumption is low either. So it seems, as was noted earlier that mothers' education level does not have any relationship with the students' alcohol consumption.
+
+There is some evidence showing that the hypotheses h4 and h5, i.e., "h4 The alcohol consumption is higher among male students who do not receive family support than female students who do not receive family support" and "h5 The alcohol consumption is higher among male students with high absences number than female students with high absences number." Are true but it is not clear how significant this relationship is.
+
+Finally, lets see a summary. It appears that students whose alcohol use is defined as high have higher number of absences. they and are likelier to be male. There is a slight higher number of students whose alcohol consumption is high with high alcohol use but that difference is not significant. And lastly, as we have already discovered, there is basically no relationship between mothers' education level and the alcohol use. I would normally drop the mothers education level out from further analysis but here I keep it just for the exercise's sake. I would probably keep the family support variable but do further analysis to select the most parsimonious model that gives an adequate description of the data.
+```{r}
+dependent <- "high_use"
+explanatory <- c("absences", "sex", "famsup", "Medu")
+alc %>% 
+  summary_factorlist(dependent, explanatory, p = TRUE,
+                     add_dependent_label = TRUE)
+```
+
+
+## Logistic regression
+
+Let's explore the distributions of the chosen variables and their relationships with alcohol consumption. Lets first check that the explanatory variables, i.e., sex, absences, family support and mother's education level are not correlated with one another. The ggpairs() function is a good way of visualising all two-way associations
+```{r}
+explanatory <- c("absences", "famsup", "Medu")
+alc %>% 
+  remove_labels() %>%
+  ggpairs(columns = explanatory, ggplot2::aes(color=sex))
+
+```
+We can check the precense of high-order correlations with variance inflation factor which can be calculated for each of the terms.Variance inflation factor tells us how much the variance of a particular regression coefficient is increased due to the presence of multicollinearity in the model. GVIF stands for generalised variance inflation factor. According to the R for [Health Data Science book](https://argoshare.is.ed.ac.uk/healthyr_book/model-assumptions.html), "a common rule of thumb is that if this is greater than 5-10 for any variable, then multicollinearity may exist. The model should be further explored and the terms removed or reduced". None of the factors are greater than 5-10 so there is no suggestion of any multicollinearity existing.
+```{r}
+dependent <- "high_use"
+explanatory <- c("absences", "sex", "Medu", "famsup")
+alc %>% 
+  glmmulti(dependent, explanatory) %>%
+  car::vif()
+```
+We use `glm()` to fit a logistic regression model with `high_use` as the target variable and `absences`, `sex`, `Medu`, and `famsup` as the predictors.
+
+```{r}
+# find the model with glm()
+m <- glm(high_use ~ absences + sex + Medu + famsup, data = alc, family = "binomial")
+
+# print out a summary of the model
+summary(m)
+
+# print out the coefficients of the model
+coef(m)
+
+# compute odds ratios (OR)
+OR <- coef(m) %>% exp
+
+# compute confidence intervals (CI)
+CI <- confint(m) %>% exp
+
+# print out the odds ratios with their confidence intervals
+cbind(OR, CI)
+
+```
+From the Coefficients we can see that it is safe to say that the null hypothesis that there is no relationship between the students alcohol consumption and the absences, sex, family support and mother's education level.It is clear that the number of absences and being a man have a relationship with high alcohol consumption. This seems to also confirm that our hypothesis h2, "the alcohol consumption is higher among male than female students" is also true.
+
+We already discarder the hypothesis h3, "the alcohol consumption is higher among male students whose mothers' education level is low than female students whose mothers' education level is low" and it seems that also hypothesis h4 "the alcohol consumption is higher among male students who do not receive family support than female students who do not receive family support" is also not true. For both variables, family support and mother's education level the Odds ration is close to 1 which suggest that these variables have no affect or the affect is very limited to students alcohol consumption. This is further confirmed with the confidence interval levels, as the CI of both variables is rather small.
+
+The model seems to confirm the hypothesis h5, that the alcohol consumption is higher among male students with high absences number than female students with high absences number. This is because of the coefficients show high significance for male sex and absences. This is further confirmed with the odds ratio  and CI levels of these variables. Although, the odd ratio for absences is just a little bit over 1.
+
+The last hypothesis h6, "the alcohol consumption is higher among students who have high number of absences, who are male, have no family support and whose mothers' education level is low', is also not true as family support and mother's education level does not have a significant relationship with the students alcohol consumption.
+
+Here Odds ratio plot which might bring what is said above more clear. Odds ratio value of 1 is the null effect. This means that if the horizontal line crosses this line it does not illustrate statistically significant result.
+
+```{r}
+dependent <- "high_use"
+explanatory_multi <- c("absences", "sex", "Medu", "famsup")
+alc %>% 
+  or_plot(dependent, explanatory_multi,
+          breaks = c(0.5, 1, 2, 5, 10, 25),
+          table_text_size = 3.5,
+          title_text_size = 16)
+```
+
+## The Predictive power of the model
+
+Let's check how well does our model actually predicts the target variable. We use the `predict()` function to make predictions with a model object. We use the 'type' argument of `predict()` to get the predictions as probabilities (instead of log of odds, which is the default).
+
+```{r}
+# predict() the probability of high_use
+probabilities <- predict(m, type = "response")
+
+# add the predicted probabilities to 'alc'
+alc <- mutate(alc, probability = probabilities)
+
+# use the probabilities to make a prediction of high_use
+alc <- mutate(alc, prediction = probability > 0.5)
+
+# look at the first ten observations of the data, along with the predictions
+select(alc, failures, absences, sex, high_use, probability, prediction) %>% head(10)
+
+# tabulate the target variable versus the predictions
+table(high_use = alc$high_use, prediction = alc$prediction)
+
+```
+
+The cross tabulation of the predictions versus the actual values (i.e., the confusion matrix) shows that the precision of this model was 27/35, i.e. around 77% and the recall was 27/111, i.e., around 24%
+
+The F1 score of the model is: True Positives/(True Positives + ((False Negatives + False Positives)/2)) which in our case is around 37%. This means that our model does not work very well at all.
+
+If we compare with the numbers in Exercise3, this model is slightly worse. When we would compare this model with simple guessing, simple guessing that someone has a high alcohol consumption would be 50%, so our model is worse than just a guess.
+
+## Simple measure of performance
+Lets check the penalty function of our model. The less we have penalty the better the model.The loss function of logistic regression shows the loss (the penalty if we predict 0 (in the first calculation) or 1 (in the second calculation)). Here we can see that the cost of predicting 0 is 0.3 which is not too bad but the cost of predicting 1 is 07, which on the other hand is not good at all.
+
+```{r}
+# define a loss function (mean prediction error)
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+# call loss_func to compute the average number of wrong predictions in the (training) data
+loss_func(class = alc$high_use, prob = 0)
+loss_func(class = alc$high_use, prob = 1)
+loss_func(class = alc$high_use, prob = alc$probability)
+
+```
+
+## Bonus: 10-Fold Cross-Validation
+```{r}
+cv <- cv.glm(data = alc, cost = loss_func, glmfit = m, K = 10)
+cv$delta[1]
+```
+This model seemed to do slightly better than the model in Exercise3. However, it still did not perform very well. If we want to have model with better performance, there are plenty of ways to do it. Good idea is also to use more time in selecting the variables. You can for example, calculate the R-squared for the last variable added to the model. This will tell how much the R-squared increased for each variable so it will represent the improvement in the goodness-of-fit. (see for example, https://statisticsbyjim.com/regression/identifying-important-independent-variables/)
