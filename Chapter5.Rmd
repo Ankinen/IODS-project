@@ -1,0 +1,239 @@
+# Dimensionality Reduction Techniques
+
+
+```{r}
+date()
+```
+
+The data used in the first part is modified from the UNDP Human development Reports Human development Index dataset.The HDI is a summary measure of average achievement in key dimensions of human development: a long and healthy life, being knowledgeable and have a decent standard of living. It also includes some measures of gender equality.
+
+More information about the Human development index can be found  from https://hdr.undp.org/data-center/human-development-index#/indicies/HDI
+
+In the dataset the name of the country is the row name
+
+Here we use the following variables:
+
+1. Life_Exp = Life Expectancy at Birth
+2. Exp_Edu = Expected Years of Education for children entering school 
+3. GNI_Capita = Gross National Income (GNI) per Capita
+4. Mater_Mort = Maternal Mortality Ratio
+5. Ado_Birth = Adolescent Birth Rate
+6. Parli_F = Percentage of female representatives in parliament
+7. Edu2_ratio is caluculated ratio of female and male populations with secondary education in each country (Female/Male)
+8. Labor_ratio is calculated ratio of labor force participation of females and males in each country
+
+Bring in the libraries
+
+```{r}
+library(dplyr)
+library(readr)
+library(tidyr)
+library(corrplot)
+library(GGally)
+library(ggplot2)
+library(FactoMineR)
+library(factoextra)
+```
+
+Load the data
+
+```{r}
+human <- read.table("data/human.csv", sep=",", header=TRUE)
+```
+
+Check how the data looks like
+
+```{r}
+colnames(human)
+
+dim(human)
+
+str(human)
+```
+
+Graphical overview of the data
+
+```{r}
+ggpairs(human)
+
+```
+
+Summaries of the variables in the data
+
+```{r}
+summary(human)
+```
+
+```{r}
+cor(human) %>% corrplot()
+```
+
+The outputs confirm what we expect.
+The education ratio is positively correlated with Life expectancy, GNI per capita, and (this is pretty obvious) with Expected education. In countries where high numbers of women are educated, people live longer, study more and earn more. They also have lower maternal mortality rate and adolescent birth rate.
+
+Life expectancy is positively correlated with GNI per capita. People in richer countries live longer. Life expectancy is negatively correlated with maternal mortality rate and adolscent birth rate. When maternal mortality rate and adolescent birth rate are positively correlated, it seems quite natural that when these two rates are high the life expectancy gets lower.
+
+Expected education is positively correlated with GNI per capita. In richer countrie people study longer but also when people study longer they earn more. High expected education also lowers the maternal mortality rate and adolescent birth rates. When women stay in school longer, they have less births and they also have babies later, which both have an impact on maternal mortality rates.
+
+In countries with high GNI per capita both maternal mortality rate and adolescent birth rate are lower. This seems also something you would expect. High income countries have more means for good public healthcare which lowers maternal birthrates and women who give birth later in their lives have usually better education so they also earn more money. 
+
+The distributions between countries in some variables are very large. For examle, the education ratio is over 8 times larger in countries with high values than with low values. What is more, the highest value indicates that more women are participating in secondary education than men.GNI per capita, maternal mortality rate and adolescent birth rate tell a story of how unequal this world is. When the lowest GNI per capita is just under 600 the highest is over 200 times higher, 123,124. When in some countries only 1 woman dies because of child birth in other countries over 1100 will perish. And when in some countries the adolescent birth rate is less than 1 in other countries it is over 200.
+
+## Principal Componen Analysis
+
+### Perform the analysis on the non-standardized data
+```{r}
+# perform principal component analysis (with the SVD method)
+pca_human <- prcomp(human)
+
+summary(pca_human)
+
+# draw a biplot of the principal component representation and the original variables
+biplot(pca_human, choices = 1:2, cex = c(0.8, 1), col = c("grey40", "deeppink2"))
+
+```
+
+### Perform the PCA on stadardized data 
+
+```{r}
+
+# standardize the variables
+human_std <- scale(human)
+
+# print out summaries of the standardized variables
+summary(human_std)
+
+```
+```{r}
+
+# perform principal component analysis (with the SVD method)
+pca_human_std <- prcomp(human_std)
+
+summary(pca_human_std)
+
+# draw a biplot of the principal component representation and the original variables
+biplot(pca_human_std, choices = 1:2, cex = c(0.8, 1), col = c("grey40", "deeppink2"))
+```
+```{r}
+human2 <- read.table("https://raw.githubusercontent.com/KimmoVehkalahti/Helsinki-Open-Data-Science/master/datasets/human2.txt", 
+                    sep =",", header = T)
+human2_std <- scale(human2)
+summary(human2_std)
+pca_human2 <- prcomp(human2_std)
+biplot(pca_human2, choices = 1:2, cex = c(0.8, 1), col = c("grey40", "deeppink2"))
+```
+
+I added here the table from the Exercise 5 where the country varibale is still in use. It is not much clearer (maybe the opposite) but we can see the names of some of the countries, so it might be helpful.
+
+The difference is mainly explained with the difference of the units between the different variables. When the ratios are very small, usually around 1, GNI per capita has the highest value of over 100,000. If we use covariance matrix, like we did with the first version of the PCA, the variables with largest variances will dominate the early components. This is also why GNI_Capita variable is alone in the first biplot and all the others are all very near each other. This is also clear if we check the summary information of the first principal component analysis, according which the PC1 is explaining nearly all the variance between the components.
+
+When we use correlation matrix instead, we standardize the unit variance. This means that all the variables in this case are equally important.We can see this from the summary table where we can see that the first component explains a little bit over 50% of the variance and we need 2 components to be able to explain just a little under 70% of the variance.  
+
+PCA is used to find the number of components that are able to provide us an adequate summary of the dataset. We can use the scree diagram to do this.
+
+```{r}
+
+screeplot(pca_human_std, type = "l", main = "Scree plot for standardized human data")
+abline(1,0, col='red', lty = 2)
+
+```
+
+Here we can see that the scree plot suggest that two components would be enough to describe the data. This is actully the number of components we have in our biplots as well. From the biplot we can see that as the angle between the arrows indicate correlation between the variables, the mater_mort and ado_birth are quite strongly correlated with each other, the same goes with Life_Exp, Exp_Edu, GNI_Capita and Edu2_ratio. This what we also saw already from the correlation plots at the beginning.
+
+
+## Tea Data
+
+The tea data comes from the FactoMineR package and it is measured with a questionnaire on tea: 300 individuals were asked how they drink tea (18 questions) and what are their product's perception (12 questions). In addition, some personal details were asked (4 questions). Here is the description: https://cran.r-project.org/web/packages/FactoMineR/FactoMineR.pdf
+
+Load the tea dataset and convert its character variables to factors
+```{r}
+tea <- read.csv("https://raw.githubusercontent.com/KimmoVehkalahti/Helsinki-Open-Data-Science/master/datasets/tea.csv", stringsAsFactors = TRUE)
+```
+
+### Explore the data
+
+Structure:
+```{r}
+str(tea)
+```
+
+Dimensions:
+```{r}
+dim(tea)
+
+```
+
+Browse the dataframe's contents
+```{r}
+View(tea)
+
+```
+
+### Visualize the data
+
+```{r}
+# Let's see how different tea drinkers perceive tea: Do they think it's relaxing, sophisticated or are tea drinkers friendly (I assume that the friendliness means this, I couldn't find )
+
+#Firs we define which columns we want to keep
+keep_columns <- c("Tea", "How", "how", "sugar", "where", "age_Q", "relaxing", "sophisticated", "friendliness")
+
+#create a new dataset with the variables we chose to keep
+tea_percep <- select(tea, one_of(keep_columns))
+
+#check how the dataframe looks like
+summary(tea_percep)
+
+str(tea_percep)
+
+#visualize the dataset
+pivot_longer(tea_percep, cols = everything()) %>%
+  ggplot(aes(value)) + facet_wrap("name", scales = "free") + geom_bar() + theme(axis.text = element_text(angle = 35, hjust = 1, size = 10))
+
+```
+
+From the plots (which are clearer if you see them with R studio) we can see that tea drinking is more common among young people than among the old. Most people connect tea drinking with friendliness a little bit less common is to connect tea drinking with sophistication. Nearly 2/3 seem to think that drinking tea is relaxing. Most people drink their tea just as it is, without adding lemon, milk or something else. However, adding sugar divides the group almost to two equal sized groups. Majority of the people surveyed buy their from chain stores and they also usually buy tea bags. And when they buy thea, it most commonly is Earl Grey.
+
+## Multiple Correspondnce Analysis
+
+```{r}
+# multiple correspondence analysis
+tea_mca <- MCA(tea_percep, graph = FALSE)
+
+# summary of the model
+summary(tea_mca)
+
+# visualize MCA
+plot(tea_mca, invisible=c("ind"), graph.type = "classic", habillage = "quali")
+```
+
+## Interpret the results
+
+First of all our model does not explain much, as it only explains just over 20% of the variation.
+This sead, we can make some conclusions (This might not be too clear from the knitted version, I used enlarged version of the plot to see it more clearly):
+
+1. The age group 35-44 likes to add lemon in their tea
+2. This previous group uses black tea and add lemon to it
+3. People 60 or over drink black tea
+4. It seems that unpacked tea is usually bough from tea shops
+5. Tea bags are bought from chain stores
+6. People who drink Earl Grey are likely to add sugar in their tea
+
+But these are just indicators and by looking at the numbers more carefully, we might actually find that these are not very significant relationships at all.
+
+## Check the Screeplot
+Just to visualize the percentages of inertia explained by each MCA dimensions we can as our last step use fviz_screeplot()  from the factoextra package:
+
+```{r}
+fviz_screeplot(tea_mca, addlabels = TRUE, ylim = c(0, 45))
+```
+
+As you can see, it's quite flat
+
+Just for fun, let's see it for the whole dataset. We put age as supplementary quantitative variable, as it is a continuour number (integer) and not a factor. Then we can place the perception questions and questions that categorize the individuals as qualitative supplementary variables.
+
+```{r}
+res.mca <- MCA(tea, quanti.sup = 19, quali.sup = c(20:36), graph = FALSE)
+fviz_screeplot(res.mca, addlabels = TRUE, ylim = c(0, 45))
+```
+
+As we can see, the variables by themselves are not explaining much. The first 10 variables explain just over 50% of the variation in the dataset.
