@@ -1,0 +1,330 @@
+# Analysis of Longitudinal Data
+
+
+```{r}
+date()
+```
+
+Bring in the libraries
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lme4)
+```
+
+## Part I
+
+In the first part, we use RATS data from a Crowder and Hand (1990) study that analysed three groups of rats that were put on different diets. In this study each rat's body weight was measured weekly, except on week 7 it was measured two times. The study lasted 9 weeks. In this part we use the RATS data to display longitudinal data graphically in ways that allow us to do some quick analysis.
+
+### prepare the data (from data wrangling part)
+
+To be able to study the possible differences in the weight value between the rats on different diets, we need to change the dataframe into long format. For that purpose we create a time variable that allows us to see the connection between the change of weight and time.
+```{r}
+RATS <- read.table("https://raw.githubusercontent.com/KimmoVehkalahti/MABS/master/Examples/data/rats.txt", header = TRUE, sep = '\t')
+RATS$ID <- factor(RATS$ID)
+RATS$Group <- factor(RATS$Group)
+RATSL <- pivot_longer(RATS, cols=-c(ID,Group), names_to = "WD",values_to = "Weight")  %>%  mutate(Time = as.integer(substr(WD,3,4))) %>% arrange(Time)
+
+str(RATSL)
+
+```
+
+### Draw the plot with `time` on the x-axis and `weight` on the y-axis
+
+Next we will use a graphical displays of data to help us expose possible patterns in the data.
+
+We plot the weight values for all the rats differentiating between the diet groups. From the graphs we van already see quite a lot. The starting weight of group 1 was lower than for the other two groups and it also stayed lower. The slope in Group 1 is also less steep, i.e., the rats in group 1 did not gein weight as much as in the other two groups. There seems to be an outlier in Group 2, the one with significantly higher start and end weights than any other member in Group 2.
+
+```{r}
+ggplot(RATSL, aes(x = Time, y = Weight, col = ID)) +
+  geom_line() +
+  scale_linetype_manual(values = rep(1:10, times=4)) +
+  facet_grid(. ~ Group, labeller = label_both) +
+  theme(legend.position = "none") + 
+  scale_y_continuous(limits = c(min(RATSL$Weight), max(RATSL$Weight)))
+```
+
+### The tracking phenomenon
+
+Next we will use a plot of the standardized values of each observation to gain a better understanding of the tracking phenomenon in the rat groups. The standardized values of each observation can be obtained by subtracting the relevant occasion mean from the original observation and then dividing by the corresponding visit standard deviation.
+
+$$standardised(x) = \frac{x - mean(x)}{ sd(x)}$$
+
+```{r}
+# Standardise the variable weight
+RATSL <- RATSL %>%
+  group_by(Time) %>%
+  mutate(stdweight = (Weight - mean(Weight))/sd(Weight)) %>%
+  ungroup()
+
+# Glimpse the data
+glimpse(RATSL)
+
+# Plot again with the standardised weight
+ggplot(RATSL, aes(x = Time, y = stdweight, col = ID)) +
+  geom_line() +
+  scale_linetype_manual(values = rep(1:10, times=4)) +
+  facet_grid(. ~ Group, labeller = label_both) +
+  scale_y_continuous(name = "standardized weight")
+```
+
+### Summary graphs
+
+Next we will create a graph that shows the average (mean) profiles for each diet group along with some indication of the variation of the observations at each time point. in this case the standard error of mean
+
+$$se = \frac{sd(x)}{\sqrt{n}}$$
+
+The group 1 is clearly separate from the other two groups. However, although the other two groups have similar slopes they still are separate and do not overlap. This suggests that all the three groups are different.
+
+```{r}
+# Number of subjects (per group):
+n <- 16
+
+# Summary data with mean and standard error of weight by treatment and week 
+RATSS <- RATSL %>%
+  group_by(Group, Time) %>%
+  summarise( mean = mean(Weight), se = sd(Weight)/sqrt(n)) %>%
+  ungroup()
+
+# Glimpse the data
+glimpse(RATSS)
+
+# Plot the mean profiles
+ggplot(RATSS, aes(x = Time, y = mean, linetype = Group, shape = Group)) +
+  geom_line() +
+  scale_linetype_manual(values = c(1,2,3)) +
+  geom_point(size=3) +
+  scale_shape_manual(values = c(1,2,3)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se, linetype="1"), width=0.3) +
+  theme(legend.position = c(0.7,0.5)) +
+  scale_y_continuous(name = "mean(weight) +/- se(weight)")
+
+```
+
+### Find outlier(s)
+
+We can also plot the mean profiles by using box plots to show the post treatment values. We use the timepoinst starting from day 8 (whish the day after the first week) to day 64. 
+
+The groups are very small, so having an outlier in each group is not very surprising. Here just for the case of exercise we remove the three outliers from each group and check the results after that again. 
+
+```{r}
+
+# Create a summary data by group and ID with mean as the summary variable (ignoring baseline week 1)
+RATSL8S <- RATSL %>%
+  filter(Time > 1) %>%
+  group_by(Group, ID) %>%
+  summarise( mean=mean(Weight) ) %>%
+  ungroup()
+
+# Glimpse the data
+glimpse(RATSL8S)
+
+# Draw a boxplot of the mean versus treatment
+ggplot(RATSL8S, aes(x = Group, y = mean)) +
+  geom_boxplot() +
+  stat_summary(fun = "mean", geom = "point", shape=23, size=4, fill = "white") +
+  scale_y_continuous(name = "mean(weigth), Time 8-64(days)")
+
+# Find the outliers
+G1 <- filter(RATSL8S, Group == "1")
+min(G1$mean)
+G2 <- filter(RATSL8S, Group == "2")
+max(G2$mean)
+G3 <- filter(RATSL8S, Group == "3")
+min(G3$mean)
+
+# Create a new data by filtering the outliers and adjust the ggplot code the draw the plot again with the new data
+RATSL8S1 <- filter(RATSL8S, ((Group == "1" & mean>238.9) | (Group == "2" & mean<594) | (Group == "3" & mean>495.2)))
+
+ggplot(RATSL8S1, aes(x = Group, y = mean)) +
+  geom_boxplot() +
+  stat_summary(fun = "mean", geom = "point", shape=23, size=4, fill = "white") +
+  scale_y_continuous(name = "mean(weight), Time 8-64(days)")
+```
+Typical with such small samples removing the outliers change the boxplots dramatically. The means also changed, for group 1 the with the outlier was over 250 and without it, it dropped under 250. With Group 2 it stayed around 450 but the 75% value dropped significantly. With Group 3 removing the outlier raised the mean value. The Box plot is giving us similar results with the previous graph, Group 1 has much lower body weights than Group 2 and Group 2. Without the outliers, Group 2 and 3 seem to be further apart from each other.
+
+### T-test and ANOVA
+
+Pairwise T-test and Anova provides us a tools to assess differences between the treatment groups, and also calculate a confidence interval for this difference.
+
+RATSL8SL1 is 3-level factor and for two-sample t-test you should have exactly 2 levels. It is not advisable to compare the different pairs separately because when doing t-test there is a chance for a Type I error (i.e. reject null hypothesis when it is true). This is each time approximately 5%. If you conduct multiple t-tests on the same data, Type I errors will be addictive. So for two t-tests the chance for Type I error will be ~ 10%.
+
+We can use here some other methods as those are readily available. These are called post hoc methods. The pairwise.t.test uses "the Bonferroni correction ("bonferroni") in which the p-values are multiplied by the number of comparisons as well as less conservative corrections such as Holm (1979) ("holm"), Hochberg (1988) ("hochberg"), Hommel (1988) ("hommel"), Benjamini & Hochberg (1995) ("BH" or its alias "fdr"), and Benjamini & Yekutieli (2001) ("BY"), respectively (https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/p.adjust).
+
+See more here: https://www.researchgate.net/post/Three-means-comparison-by-t-test-or-ANOVA
+https://www.statology.org/bonferroni-correction-in-r/
+
+We use the data without the outlier created in the previous exercise. The pariwise t-test confirms that the three groups are different. From ANOVA we can see that the baseline weight is strongly related to the measured weights after the diets began. However the difference between each Diet group is not significant.
+
+```{r}
+# Perform a pairwise.t.test
+
+pairwise.t.test(RATSL8S1$mean, RATSL8S1$Group, p.adjust.method = p.adjust.methods)
+
+# Add the baseline from the original data as a new variable to the summary data
+RATSL8S2 <- RATSL8S %>%
+  mutate(baseline = RATS$WD1)
+
+# Fit the linear model with the mean as the response
+fit <- lm(mean ~ baseline + Group, data = RATSL8S2)
+
+# Compute the analysis of variance table for the fitted model with anova()
+anova(fit)
+
+```
+
+
+## PART II
+
+In this second part we use data taken from Davis (2002). There are two treatment groups each having 20 male subjects. Each subject was rated on the brief psychiatric rating scale (BPRS) measured before treatment began (week 0) and then at weekly intervals for eight weeks. The BPRS assesses the level of 18 symptom constructs where each is rated from one (not present) to seven (extremely severe). The scale is used to evaluate patients suspected of having schizophrenia.
+
+### prepare the data (from data wrangling part)
+
+For the convenience sake, we separate the individuals in the different treatment groups with unique ID created by adding the treatment group number infront of the ID number.
+
+To be able to study the differences between the different treatment groups we need to change the dataframe from wide to long format. This done with the pivot_longer function.
+
+```{r}
+
+BPRS <- read.table("https://raw.githubusercontent.com/KimmoVehkalahti/MABS/master/Examples/data/BPRS.txt", sep  =" ", header = T) %>% mutate( subject = paste(treatment, subject, sep="-") )
+BPRS$treatment <- factor(BPRS$treatment)
+BPRS$subject <- factor(BPRS$subject)
+BPRSL <-  pivot_longer(BPRS, cols=-c(treatment,subject),names_to = "weeks",values_to = "bprs") %>% arrange(weeks)
+BPRSL <-  BPRSL %>% mutate(week = as.integer(substr(weeks,5,5)))
+rm(BPRS)
+
+```
+ 
+
+### Plot first
+
+First we plot the data but ignore the longitudinal nature of the data. This is to identify the observations in the two treatment groups.
+
+```{r}
+
+# Check the dimensions of the data
+dim(BPRSL)
+
+str(BPRSL)
+
+# Plot the BPRSL data
+ggplot(BPRSL, aes(x = week, y = bprs, group = subject)) +
+  geom_line() + aes(col = treatment) +
+  scale_x_continuous(name = "Time (weeks)") +
+  scale_y_continuous(name = "BPRS") + theme(legend.position = "top") +
+  theme(panel.grid.minor = element_blank())
+  
+```
+
+We can see from this plot that the general trend for both treatment group is the decreasing BPRS rating over the 8 weeks. Smilarly it seems that for those individuals who start with higher values tend to have higher values in the end too. This phenomenon is called tracking (we do not analyse this phenomenon here). It also seems that at the beginning the individuals had greater differences, before the treatment, in week 0, the lines are more dispersed abd during the treatment they sart to get closer to each other.
+
+### Linear Model
+
+Next we will fit multiple linear regression model with 'bprs' as response and 'week' and 'treatment' as explanatory variables. The results show, as we can also see from the plot, the time variable (here week) is negative indicating that the bprs values decrease over time.
+
+
+```{r}
+
+# create a regression model BPRS_reg
+BPRS_reg <- lm(bprs ~ week + treatment, data =  BPRSL)
+
+# print out a summary of the model
+summary(BPRS_reg)
+
+```
+
+### The Random Intercept Model
+
+The random intercept model takes into account the fact that it is highly likely that the repeated measurements of BPRS are not independent. For various reasons people might answer the questionnaires differently and there are likely to be many reasons of which some are unobserved, why this happens. We will first use the random intercept model, where the idea is to include those random effects into the model.
+
+Let's fit the random intercept model to our dataframe. We use BPRS as the outcome variable and week and treatment as the fixed effects. The number one in (1 | subject) tells us that we want to have the random intercept and the subject is the id of the person, here it indicates the unit of the repeated measurements. This will create the random intercept for each participant.
+```{r}
+# Create a random intercept model
+BPRS_ref <- lmer(bprs ~ week + treatment + (1 | subject), data = BPRSL, REML = FALSE)
+
+# Print the summary of the model
+summary(BPRS_ref)
+
+```
+
+The random intercept model gives us different intercepts for each patient but the estimated slope stays the same.
+As we can see from the results, lme4 does not provide the p-value. This is because standardly calculated p-values will not always work. We can see from the Fixed effects that:
+
+    - on average, patients' BPRS value is 46.45 at the beginning of the treatment.
+    - on average, pathients BPRS value will decrease 2.27 points per week
+    
+The random effects part tells us about the variance components. 
+This is the interclass correlation that is the proportion of the total residual variance that is caused by residual variability between subjects, i.e., 
+$cor= \frac{\sigma^2_u}{\sigma^2_u + \sigma^2}$
+
+From the results we can see the
+the variance of the random error (i.e., the $\sigma^2_u$ in the formula) this is the estimated variance between-subject deviations, here it is 97.39.
+the residual variance, i.e., the measurement error (i.e., the $\sigma^2}$ in the formula) this is the estimated variance within-subject deviations, here it is 54.23.
+
+We can use this information to calculate the interclass correlation coefficient (ICC) (i.e., the forumla above): 97.39 / (97.39 + 54.23) = 0.64. This varies always between 0 and 1. The higher the ICC the stronger correlation within a subject.
+
+
+### Random Intercept and Random Slope Model
+
+The random intercept and random slope model allows the linear regression fits for each individual to differ in intercept but also in slope. This is different from the previous model in that it also allows the slope to have random values for each individual, not just for the random intercepts. This way it is possible to account for the effect of time and the individual differences in the rats' growth profiles.
+
+We will fit the model with BPRS as the outcome variable, treatment is the fixed variable and (week | subject) defines the random effects specifications. We will use week and subject as the random effects.
+```{r}
+
+# create a random intercept and random slope model
+BPRS_ref1 <- lmer(bprs ~ week + treatment + (week | subject), data = BPRSL, REML = FALSE)
+
+# print a summary of the model
+summary(BPRS_ref1)
+
+# perform an ANOVA test on the two models
+anova(BPRS_ref1, BPRS_ref)
+
+```
+
+Similar to the previous results we can see the the patients' BPRS on average is 45.98 and the decrease of the BPRS value per week is 1.51.
+
+The ANOVA seems to suggest that the second model is better, this is also true when we check the AIC and BIC values. AIC attempts to identify the model that will best predict future data and BIC attempts to identify the true model. The model with smaller AIC and BIC values is better. The p-value shows that the difference between the two models is statistically significant, i.e., the BPRS_ref1 model is better.
+
+### Random Intercept and Random Slope Model with interaction
+
+In this last section, we can fit a random intercept and slope model that allows for a week × treatment interaction. Again we get similar values and we already know how to interpret them. ANOVA tells us that the model in the previous part, BPRS_ref1 is better, the AIC and BIC values are somewhat smaller in ref_1 than ref_2 model. And the p-value for the second model shows a non-significant result, so we should keep using the BPRS_ref1 model.
+
+The fitted model with random slope shows us how the slops vary between the individuals. There seems to be even one with relatively flat slope.
+
+```{r}
+
+# create a random intercept and random slope model with the interaction
+BPRS_ref2 <- lmer(bprs ~ week * treatment + (week | subject), data = BPRSL, REML = FALSE)
+
+# print a summary of the model
+summary(BPRS_ref2)
+
+# perform an ANOVA test on the two models
+anova(BPRS_ref2, BPRS_ref1)
+
+# draw the plot of BPRSL with the observed Weight values
+ggplot(BPRSL, aes(x = week, y = bprs, group = subject)) +
+  geom_line(aes(col = treatment)) +
+  scale_x_continuous(name = "week", breaks = seq(0, 8, 1)) +
+  scale_y_continuous(name = "BPRS") +
+  theme(legend.position = "top")
+
+# Create a vector of the fitted values
+Fitted <- fitted(BPRS_ref2)
+
+# Create a new column fitted to BPRSL
+BPRSL <- BPRSL %>% mutate(Fitted)
+
+# draw the plot of BPRSL with the Fitted values of weight
+library(ggplot2)
+ggplot(BPRSL, aes(x = week, y = Fitted, group = subject)) +
+  geom_line(aes(col = treatment)) +
+  scale_x_continuous(name = "week", breaks = seq(0, 8, 1)) +
+  scale_y_continuous(name = "Fitted BPRS values") +
+  theme(legend.position = "top")
+
+```
+
